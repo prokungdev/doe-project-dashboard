@@ -7,10 +7,19 @@ Fixes: monthly tab, sidebar scroll, table view, project allocation page
 import json, os
 
 def build():
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard_data.json')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    p = os.path.join(base_dir, 'dashboard_data.json')
     with open(p, 'r', encoding='utf-8') as f:
         data = json.load(f)
     dj = json.dumps(data, ensure_ascii=False)
+
+    p_det = os.path.join(base_dir, 'dashboard_detail.json')
+    if os.path.exists(p_det):
+        with open(p_det, 'r', encoding='utf-8') as f:
+            det_data = json.load(f)
+    else:
+        det_data = {'template': [], 'units': {}}
+    det_j = json.dumps(det_data, ensure_ascii=False)
 
     html = r"""<!DOCTYPE html>
 <html lang="th">
@@ -296,6 +305,34 @@ td.qt4{color:var(--rose);font-weight:600}
 .nbadge{display:inline-flex;width:22px;height:22px;border-radius:5px;
   align-items:center;justify-content:center;font-weight:700;font-size:.7rem}
 
+/* Activity Tree Table & Excel View */
+.act-plan{background:#e2e8f0;font-weight:700;color:var(--dark);border-top:2px solid #cbd5e1}
+.act-proj{background:#f1f5f9;font-weight:700;color:var(--purple);border-left:4px solid var(--purple)}
+.act-main{font-weight:600;color:var(--text);background:#fafbfc}
+.act-sub{color:var(--text2)}
+.act-item{color:var(--text2)}
+.act-unit{color:var(--muted);font-style:italic}
+.act-zero{opacity:.55}
+.act-zero:hover{opacity:1}
+.badge-code{font-size:.68rem;padding:2px 6px;border-radius:4px;background:rgba(108,99,255,.1);color:var(--purple);font-weight:600;display:inline-block}
+.badge-row{font-size:.65rem;color:var(--muted);font-family:monospace;padding:1px 5px;border-radius:3px;background:rgba(0,0,0,.05)}
+.btn-tool{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:#fff;font-size:.78rem;font-family:'Sarabun',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--text2);transition:all .2s;white-space:nowrap}
+.btn-tool:hover{border-color:var(--purple);color:var(--purple);background:rgba(108,99,255,.04)}
+.check-lbl{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text2);cursor:pointer;user-select:none}
+
+/* Modal Popup */
+.modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.65);backdrop-filter:blur(4px);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-backdrop.open{opacity:1;pointer-events:auto}
+.modal-box{background:#fff;border-radius:14px;width:100%;max-width:1100px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,.25);overflow:hidden;animation:modalIn .25s ease}
+@keyframes modalIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-head{padding:16px 22px;background:var(--dark);color:#fff;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-title{font-size:1.05rem;font-weight:700}
+.modal-sub{font-size:.78rem;color:rgba(255,255,255,.6);margin-top:2px}
+.modal-close{background:rgba(255,255,255,.1);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:background .2s}
+.modal-close:hover{background:rgba(255,255,255,.25)}
+.modal-body{padding:18px 22px;overflow:auto;flex:1}
+.modal-foot{padding:12px 22px;background:#f8fafc;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0}
+
 /* Fade */
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .fi{animation:fadeUp .3s ease forwards}
@@ -389,12 +426,16 @@ td.qt4{color:var(--rose);font-weight:600}
 
 <script>
 const D = """ + dj + r""";
+const DET = """ + det_j + r""";
+window.D = D;
+window.DET = DET;
 D.units.forEach((u,i) => { u.id = i; });
 
 // State
 const S = {
   mini: false, page:'overview', cat:null, unit:null, openCat:null,
-  cs:'', csort:'td', projNum:1, pcat:'all', psearch:'', pview:'quarter', charts:[]
+  cs:'', csort:'td', projNum:1, pcat:'all', psearch:'', pview:'quarter', charts:[],
+  uview: 'proj', detView: 'quarter', detHideZero: true, detSearch: '', detProj: 0
 };
 
 // Colors
@@ -652,7 +693,14 @@ function renderOverview(){
   <tbody>
   ${projs.map((p,i)=>{const t=PT[p.num];return`<tr>
     <td><span class="nbadge" style="background:${PC[i%PC.length]}18;color:${PC[i%PC.length]}">${p.num}</span></td>
-    <td class="bold">${p.name}</td>
+    <td class="bold">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>${p.name}</span>
+        <button onclick="openDetailForProj(${p.num})" class="btn-tool" style="padding:2px 8px;font-size:.7rem;flex-shrink:0" title="คลิกเพื่อดูรายละเอียดกิจกรรมของโครงการนี้">
+          <i class="fas fa-list-check" style="color:${PC[i%PC.length]}"></i> ดูกิจกรรม
+        </button>
+      </div>
+    </td>
     <td class="r bold">${fmt(t.target)}</td>
     <td class="r qt1">${fmt(t.q1)}</td>
     <td class="r qt2">${fmt(t.q2)}</td>
@@ -841,6 +889,7 @@ function renderUnit(unit){
 <div class="vtabs">
   <button class="vtab active" id="vt-proj" onclick="switchUnitView('proj')"><i class="fas fa-table-list"></i> รายโครงการ</button>
   <button class="vtab" id="vt-month" onclick="switchUnitView('month')"><i class="fas fa-calendar-alt"></i> ตารางรายเดือน</button>
+  <button class="vtab" id="vt-detail" onclick="switchUnitView('detail')"><i class="fas fa-file-excel" style="color:var(--green)"></i> รายละเอียดกิจกรรม (Excel View)</button>
 </div>
 <div id="uArea"></div>
 </div>`;
@@ -873,10 +922,248 @@ function renderUnit(unit){
 }
 
 function switchUnitView(v){
+  S.uview = v;
   document.getElementById('vt-proj')?.classList.toggle('active',v==='proj');
   document.getElementById('vt-month')?.classList.toggle('active',v==='month');
+  document.getElementById('vt-detail')?.classList.toggle('active',v==='detail');
   if(v==='proj') renderProjTable();
-  else renderMonthTable();
+  else if(v==='month') renderMonthTable();
+  else renderDetailTable();
+}
+
+function openDetailForProj(pNum){
+  S.detProj = pNum;
+  switchUnitView('detail');
+  const sel = document.getElementById('detProjSel');
+  if(sel) sel.value = pNum;
+}
+
+function setDetView(v){
+  S.detView = v;
+  renderDetailTable();
+}
+
+function toggleDetZero(checked){
+  S.detHideZero = checked;
+  renderDetailTable();
+}
+
+function setDetSearch(q){
+  S.detSearch = q;
+  renderDetailTable();
+}
+
+function setDetProjFilter(num){
+  S.detProj = parseInt(num) || 0;
+  renderDetailTable();
+}
+
+function exportUnitDetailCsv(){
+  const unit = _u; if(!unit) return;
+  const uDet = (DET && DET.units) ? (DET.units[unit.sheet] || {}) : {};
+  const tmpl = (DET && DET.template) ? DET.template : [];
+  let csv = "\uFEFFแถว Excel,ระดับ,รหัส,แผนงาน/โครงการ/กิจกรรม,หน่วยนับ,เป้าหมายรวม,ต.ค.,พ.ย.,ธ.ค.,รวม Q1,ม.ค.,ก.พ.,มี.ค.,รวม Q2,เม.ย.,พ.ค.,มิ.ย.,รวม Q3,ก.ค.,ส.ค.,ก.ย.,รวม Q4\n";
+  tmpl.forEach(it => {
+    const v = uDet[String(it.r)] || [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+    if(S.detHideZero && v[0] === 0 && it.level > 1) return;
+    const nameEsc = `"${(it.name||'').replace(/"/g, '""')}"`;
+    csv += `R${it.r},${it.level},"${it.code||''}",${nameEsc},"${it.unit||''}",${v.join(',')}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `รายละเอียดกิจกรรม_${unit.name}.csv`;
+  a.click();
+}
+
+function renderDetailTable(){
+  const unit = _u; if(!unit) return;
+  const uDet = (DET && DET.units) ? (DET.units[unit.sheet] || {}) : {};
+  const tmpl = (DET && DET.template) ? DET.template : [];
+  
+  const q = (S.detSearch || '').trim().toLowerCase();
+  const pFilter = parseInt(S.detProj || 0);
+  const hideZero = S.detHideZero;
+  
+  const activeProjs = new Set();
+  tmpl.forEach(it => {
+    const v = uDet[String(it.r)];
+    if(v && v[0] > 0 && it.proj > 0) activeProjs.add(it.proj);
+  });
+  
+  const filtered = tmpl.filter(it => {
+    if(pFilter > 0 && it.proj !== pFilter && it.level > 0) return false;
+    const v = uDet[String(it.r)];
+    const t = v ? v[0] : 0;
+    
+    if(hideZero && t === 0) {
+      if(it.level === 0) {
+        const projsInPlan = tmpl.filter(x => x.plan === it.name && x.level === 1).map(x => x.proj);
+        if(!projsInPlan.some(p => activeProjs.has(p))) return false;
+      } else if(it.level === 1) {
+        if(!activeProjs.has(it.proj)) return false;
+      } else {
+        return false;
+      }
+    }
+    
+    if(q) {
+      const matchName = (it.name || '').toLowerCase().includes(q);
+      const matchCode = (it.code || '').toLowerCase().includes(q);
+      const matchUnit = (it.unit || '').toLowerCase().includes(q);
+      if(!matchName && !matchCode && !matchUnit) return false;
+    }
+    return true;
+  });
+  
+  const isMonth = S.detView === 'month';
+  const cv = (val, cls='') => `<td class="${cls}" style="${val>0?'':'color:#cbd5e1'}">${val>0?fmt(val):'-'}</td>`;
+  
+  const rowsHtml = filtered.map(it => {
+    const v = uDet[String(it.r)] || [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+    const t = v[0];
+    const isZero = t === 0;
+    
+    let rowClass = '';
+    let indentPx = 0;
+    if(it.level === 0) {
+      rowClass = 'act-plan';
+      indentPx = 4;
+    } else if(it.level === 1) {
+      rowClass = 'act-proj';
+      indentPx = 14;
+    } else if(it.level === 2) {
+      rowClass = 'act-main';
+      indentPx = 28;
+    } else if(it.level === 3) {
+      rowClass = 'act-sub';
+      indentPx = 42;
+    } else if(it.level === 3.5) {
+      rowClass = 'act-unit';
+      indentPx = 48;
+    } else if(it.level === 4) {
+      rowClass = 'act-item';
+      indentPx = 56;
+    }
+    
+    if(isZero && it.level > 1) rowClass += ' act-zero';
+    const targetDisp = t > 0 ? `<span class="bold" style="color:var(--dark)">${fmt(t)}</span>` : `<span style="color:#cbd5e1">-</span>`;
+    
+    if(!isMonth) {
+      const q1 = v[4], q2 = v[8], q3 = v[12], q4 = v[16];
+      return `<tr class="${rowClass}">
+        <td><span class="badge-row">R${it.r}</span></td>
+        <td>
+          <div style="padding-left:${indentPx}px;display:flex;align-items:baseline;gap:6px">
+            ${it.code ? `<span class="badge-code">${it.code}</span>` : ''}
+            <span class="${it.level<=2?'bold':''}">${it.name}</span>
+          </div>
+        </td>
+        <td style="color:var(--muted);font-size:.8rem">${it.unit||''}</td>
+        <td class="r">${targetDisp}</td>
+        ${cv(q1, 'r qt1')}
+        ${cv(q2, 'r qt2')}
+        ${cv(q3, 'r qt3')}
+        ${cv(q4, 'r qt4')}
+      </tr>`;
+    } else {
+      return `<tr class="${rowClass}">
+        <td><span class="badge-row">R${it.r}</span></td>
+        <td>
+          <div style="padding-left:${indentPx}px;display:flex;align-items:baseline;gap:6px">
+            ${it.code ? `<span class="badge-code">${it.code}</span>` : ''}
+            <span class="${it.level<=2?'bold':''}">${it.name}</span>
+          </div>
+        </td>
+        <td style="color:var(--muted);font-size:.8rem">${it.unit||''}</td>
+        <td class="r">${targetDisp}</td>
+        ${cv(v[1])}${cv(v[2])}${cv(v[3])}${cv(v[4], 'r qt1')}
+        ${cv(v[5])}${cv(v[6])}${cv(v[7])}${cv(v[8], 'r qt2')}
+        ${cv(v[9])}${cv(v[10])}${cv(v[11])}${cv(v[12], 'r qt3')}
+        ${cv(v[13])}${cv(v[14])}${cv(v[15])}${cv(v[16], 'r qt4')}
+      </tr>`;
+    }
+  }).join('');
+  
+  let theadHtml = '';
+  if(!isMonth) {
+    theadHtml = `<tr>
+      <th style="width:48px">แถว</th>
+      <th>แผนงาน / โครงการ / ผลผลิต / กิจกรรม</th>
+      <th style="width:75px">หน่วยนับ</th>
+      <th class="r" style="width:105px">เป้าหมายรวม</th>
+      <th class="r q1" style="width:85px">Q1</th>
+      <th class="r q2" style="width:85px">Q2</th>
+      <th class="r q3" style="width:85px">Q3</th>
+      <th class="r q4" style="width:85px">Q4</th>
+    </tr>`;
+  } else {
+    theadHtml = `
+      <tr>
+        <th rowspan="2" style="width:48px">แถว</th>
+        <th rowspan="2">แผนงาน / โครงการ / ผลผลิต / กิจกรรม</th>
+        <th rowspan="2" style="width:70px">หน่วย</th>
+        <th rowspan="2" class="r" style="width:95px">เป้าหมาย</th>
+        <th colspan="4" class="c q1">ไตรมาส 1 (ปี 2569)</th>
+        <th colspan="4" class="c q2">ไตรมาส 2</th>
+        <th colspan="4" class="c q3">ไตรมาส 3</th>
+        <th colspan="4" class="c q4">ไตรมาส 4</th>
+      </tr>
+      <tr>
+        <th class="c q1">ต.ค.</th><th class="c q1">พ.ย.</th><th class="c q1">ธ.ค.</th><th class="c q1" style="font-weight:800">รวม</th>
+        <th class="c q2">ม.ค.</th><th class="c q2">ก.พ.</th><th class="c q2">มี.ค.</th><th class="c q2" style="font-weight:800">รวม</th>
+        <th class="c q3">เม.ย.</th><th class="c q3">พ.ค.</th><th class="c q3">มิ.ย.</th><th class="c q3" style="font-weight:800">รวม</th>
+        <th class="c q4">ก.ค.</th><th class="c q4">ส.ค.</th><th class="c q4">ก.ย.</th><th class="c q4" style="font-weight:800">รวม</th>
+      </tr>`;
+  }
+  
+  document.getElementById('uArea').innerHTML = `
+    <div class="fbar" style="background:#fff;padding:12px 16px;border-radius:var(--r);border:1px solid var(--border);margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1">
+        <div class="fsearch" style="max-width:240px">
+          <i class="fas fa-search"></i>
+          <input type="text" id="detSearchInput" placeholder="ค้นหากิจกรรม หรือหน่วย..." value="${S.detSearch}" oninput="setDetSearch(this.value)">
+        </div>
+        <select class="btn-tool" id="detProjSel" onchange="setDetProjFilter(this.value)" style="outline:none;cursor:pointer">
+          <option value="0">📂 ทุกโครงการ (11 โครงการ)</option>
+          ${D.projects.map(p=>`<option value="${p.num}" ${S.detProj==p.num?'selected':''}>โครงการ ${p.num}: ${p.name.length>30?p.name.slice(0,28)+'...':p.name}</option>`).join('')}
+        </select>
+        <label class="check-lbl" style="background:var(--page);padding:6px 12px;border-radius:8px;border:1px solid var(--border)">
+          <input type="checkbox" id="detHideZeroCb" ${S.detHideZero?'checked':''} onchange="toggleDetZero(this.checked)">
+          <span style="font-weight:600">ซ่อนรายการที่เป็น 0</span>
+        </label>
+      </div>
+      <div class="vtabs" style="margin-bottom:0">
+        <button class="vtab ${!isMonth?'active':''}" id="dvt-q" onclick="setDetView('quarter')"><i class="fas fa-chart-simple"></i> ไตรมาส</button>
+        <button class="vtab ${isMonth?'active':''}" id="dvt-m" onclick="setDetView('month')"><i class="fas fa-calendar-alt"></i> 12 เดือน</button>
+      </div>
+      <button class="btn-tool" onclick="exportUnitDetailCsv()"><i class="fas fa-file-csv" style="color:var(--green)"></i> ส่งออก CSV</button>
+    </div>
+    
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:.82rem;color:var(--text2)">
+      <div>
+        <i class="fas fa-sheet-plastic" style="color:var(--green);margin-right:6px"></i>
+        แผ่นงาน Excel: <strong style="color:var(--dark)">${unit.sheet}</strong> | 
+        แสดง <strong>${filtered.length}</strong> จาก ${tmpl.length} รายการ
+        ${hideZero ? '<span style="color:var(--muted);margin-left:6px">(ซ่อนรายการที่เป็น 0 อยู่)</span>' : ''}
+      </div>
+      <div>
+        <span class="badge-row">R8–R194</span> อ้างอิงตรงกับแถวในชีต Excel
+      </div>
+    </div>
+    
+    <div class="tw" style="overflow:auto;max-height:75vh">
+      <table style="min-width:${isMonth?'1200px':'850px'}">
+        <thead style="position:sticky;top:0;z-index:10;background:var(--dark);box-shadow:0 2px 8px rgba(0,0,0,.15)">
+          ${theadHtml}
+        </thead>
+        <tbody>
+          ${rowsHtml.length > 0 ? rowsHtml : `<tr><td colspan="${isMonth?20:8}" style="text-align:center;padding:30px;color:var(--muted)">ไม่พบกิจกรรมที่ตรงตามเงื่อนไขการค้นหา</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function renderProjTable(){
@@ -1087,10 +1374,17 @@ function renderProjAlloc(){
           <td class="r qt2">${a.q2>0?fmt(a.q2):'-'}</td>
           <td class="r qt3">${a.q3>0?fmt(a.q3):'-'}</td>
           <td class="r qt4">${a.q4>0?fmt(a.q4):'-'}</td>
-          <td class="c"><button onclick="pickUnit(${a.id});"
-            style="padding:3px 10px;border-radius:6px;border:1px solid ${color};color:${color};background:${color}0d;cursor:pointer;font-size:.73rem;font-family:'Sarabun',sans-serif">
-            เปิดดู <i class="fas fa-arrow-right" style="font-size:.65rem"></i>
-          </button></td>
+          <td class="c" style="white-space:nowrap;display:flex;gap:4px;justify-content:center">
+            <button onclick="openProjDetailModal(${a.id}, ${pNum});"
+              class="btn-tool" style="padding:3px 8px;font-size:.72rem;color:var(--purple);border-color:rgba(108,99,255,.3)"
+              title="ดูกิจกรรมย่อยของโครงการนี้">
+              <i class="fas fa-list-check"></i> ดูกิจกรรม
+            </button>
+            <button onclick="pickUnit(${a.id});"
+              style="padding:3px 8px;border-radius:6px;border:1px solid ${color};color:${color};background:${color}0d;cursor:pointer;font-size:.72rem;font-family:'Sarabun',sans-serif">
+              เปิดดู <i class="fas fa-arrow-right" style="font-size:.65rem"></i>
+            </button>
+          </td>
         </tr>`;
       }).join('')}
       </tbody>
@@ -1196,6 +1490,87 @@ function renderProjAlloc(){
 ${tableHtml}`;
 }
 
+function openProjDetailModal(unitId, projNum){
+  const unit = D.units[unitId]; if(!unit) return;
+  const proj = D.projects.find(p=>p.num === projNum);
+  const uDet = (DET && DET.units) ? (DET.units[unit.sheet] || {}) : {};
+  const items = (DET && DET.template) ? DET.template.filter(it => it.proj === projNum) : [];
+  
+  const mHtml = `
+  <div class="modal-backdrop open" id="detailModal" onclick="if(event.target===this)closeDetailModal()">
+    <div class="modal-box fi">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title"><i class="fas fa-file-lines" style="color:var(--amber);margin-right:8px"></i>รายละเอียดกิจกรรม: โครงการ ${proj.num} ${proj.name}</div>
+          <div class="modal-sub">หน่วยงาน: <strong>${unit.name}</strong> (${unit.category}) | แผ่นงาน: ${unit.sheet}</div>
+        </div>
+        <button class="modal-close" onclick="closeDetailModal()"><i class="fas fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="tw" style="overflow:auto;max-height:60vh">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:50px">#</th>
+                <th>กิจกรรม / รายการ</th>
+                <th style="width:75px">หน่วย</th>
+                <th class="r" style="width:95px">เป้าหมายรวม</th>
+                <th class="r q1">Q1</th>
+                <th class="r q2">Q2</th>
+                <th class="r q3">Q3</th>
+                <th class="r q4">Q4</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(it => {
+                const v = uDet[String(it.r)] || [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+                const t = v[0];
+                const q1 = v[4], q2 = v[8], q3 = v[12], q4 = v[16];
+                const isZero = t === 0;
+                const indent = Math.max(0, (it.level - 2) * 16);
+                return `<tr class="${isZero?'act-zero':''}">
+                  <td><span class="badge-row">R${it.r}</span></td>
+                  <td>
+                    <div style="padding-left:${indent}px;display:flex;align-items:baseline;gap:6px">
+                      ${it.code ? `<span class="badge-code">${it.code}</span>` : ''}
+                      <span class="${it.level<=2?'bold':''}">${it.name}</span>
+                    </div>
+                  </td>
+                  <td style="color:var(--muted);font-size:.8rem">${it.unit||''}</td>
+                  <td class="r bold" style="color:${t>0?'var(--purple)':'var(--light)'}">${t>0?fmt(t):'-'}</td>
+                  <td class="r qt1">${q1>0?fmt(q1):'-'}</td>
+                  <td class="r qt2">${q2>0?fmt(q2):'-'}</td>
+                  <td class="r qt3">${q3>0?fmt(q3):'-'}</td>
+                  <td class="r qt4">${q4>0?fmt(q4):'-'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-tool" onclick="closeDetailModal();pickUnit(${unit.id});setTimeout(()=>switchUnitView('detail'),100);">
+          <i class="fas fa-up-right-from-square"></i> ไปที่หน้ารายละเอียดเต็มของหน่วยงานนี้
+        </button>
+        <button class="btn-tool" style="background:var(--dark);color:#fff;border-color:var(--dark)" onclick="closeDetailModal()">ปิด</button>
+      </div>
+    </div>
+  </div>`;
+  
+  let mDiv = document.getElementById('modalContainer');
+  if(!mDiv){
+    mDiv = document.createElement('div');
+    mDiv.id = 'modalContainer';
+    document.body.appendChild(mDiv);
+  }
+  mDiv.innerHTML = mHtml;
+}
+
+function closeDetailModal(){
+  const m = document.getElementById('detailModal');
+  if(m) m.remove();
+}
+
 // INIT
 document.addEventListener('DOMContentLoaded',()=>{
   initSidebar();
@@ -1208,6 +1583,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
     # Inject data
     html = html.replace('""" + dj + r"""', dj, 1)
+    html = html.replace('""" + det_j + r"""', det_j, 1)
 
     for fn in ['dashboard.html', 'index.html']:
         fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), fn)
