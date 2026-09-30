@@ -391,7 +391,7 @@ td.qt4{color:var(--rose);font-weight:600}
 
     <div class="sb-item" id="nav-regional" onclick="toggleCat('regional','ศูนย์ภาค')" data-tip="ศูนย์ภาค">
       <div class="sb-ico"><i class="fas fa-map-location-dot"></i></div>
-      <span class="sb-lname">ศูนย์บริการจัดหางาน</span>
+      <span class="sb-lname">ศูนย์ภาค</span>
       <span class="sb-cnt" id="cnt-regional">-</span>
     </div>
     <div class="sb-sub-menu" id="sub-regional"></div>
@@ -932,10 +932,14 @@ function switchUnitView(v){
 }
 
 function openDetailForProj(pNum){
-  S.detProj = pNum;
-  switchUnitView('detail');
-  const sel = document.getElementById('detProjSel');
-  if(sel) sel.value = pNum;
+  if(S.page === 'unit' && _u){
+    S.detProj = pNum;
+    switchUnitView('detail');
+    const sel = document.getElementById('detProjSel');
+    if(sel) sel.value = pNum;
+  } else {
+    openOverviewProjDetailModal(pNum);
+  }
 }
 
 function setDetView(v){
@@ -1179,7 +1183,14 @@ function renderProjTable(){
   <tbody>
   ${unit.projects.map((p,i)=>`<tr>
     <td><span class="nbadge" style="background:${PC[i%PC.length]}18;color:${PC[i%PC.length]}">${p.num}</span></td>
-    <td class="bold">${p.name}</td>
+    <td class="bold">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>${p.name}</span>
+        <button onclick="openDetailForProj(${p.num})" class="btn-tool" style="padding:2px 8px;font-size:.7rem;flex-shrink:0" title="คลิกเพื่อดูรายละเอียดกิจกรรมของโครงการนี้สำหรับหน่วยงานนี้">
+          <i class="fas fa-list-check" style="color:${PC[i%PC.length]}"></i> ดูกิจกรรม
+        </button>
+      </div>
+    </td>
     <td style="color:var(--muted)">${p.unit||''}</td>
     <td class="r bold" style="color:${p.target>0?PC[i%PC.length]:'var(--light)'}">${p.target>0?fmt(p.target):'-'}</td>
     <td class="r qt1">${p.q1.total>0?fmt(p.q1.total):'-'}</td>
@@ -1569,6 +1580,139 @@ function openProjDetailModal(unitId, projNum){
 function closeDetailModal(){
   const m = document.getElementById('detailModal');
   if(m) m.remove();
+}
+
+function openOverviewProjDetailModal(projNum){
+  const proj = D.projects.find(p => p.num === projNum);
+  if(!proj) return;
+  const items = (DET && DET.template) ? DET.template.filter(it => it.proj === projNum) : [];
+  
+  // Calculate project total target and Q1-Q4 across all units
+  let projTarget = 0, pQ1 = 0, pQ2 = 0, pQ3 = 0, pQ4 = 0;
+  D.units.forEach(u => {
+    const p = u.projects.find(x => x.num === projNum);
+    if(p){
+      projTarget += p.target || 0;
+      pQ1 += p.q1?.total || 0;
+      pQ2 += p.q2?.total || 0;
+      pQ3 += p.q3?.total || 0;
+      pQ4 += p.q4?.total || 0;
+    }
+  });
+
+  // Aggregate activity breakdown across all 124 units
+  const allUnitsDet = (DET && DET.units) ? DET.units : {};
+  const rowAgg = {};
+  items.forEach(it => {
+    let t = 0, q1 = 0, q2 = 0, q3 = 0, q4 = 0;
+    const rKey = String(it.r);
+    for(const s in allUnitsDet){
+      const v = allUnitsDet[s][rKey];
+      if(v){
+        t += (v[0] || 0);
+        q1 += (v[4] || 0);
+        q2 += (v[8] || 0);
+        q3 += (v[12] || 0);
+        q4 += (v[16] || 0);
+      }
+    }
+    rowAgg[rKey] = { t, q1, q2, q3, q4 };
+  });
+
+  const pIdx = D.projects.indexOf(proj);
+  const color = PC[pIdx % PC.length];
+
+  const mHtml = `
+  <div class="modal-backdrop open" id="detailModal" onclick="if(event.target===this)closeDetailModal()">
+    <div class="modal-box fi" style="max-width:1000px">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">
+            <span class="nbadge" style="background:${color}18;color:${color};margin-right:6px">P${proj.num}</span>
+            <i class="fas fa-list-check" style="color:${color};margin-right:6px"></i>
+            รายละเอียดกิจกรรม: ${proj.name}
+          </div>
+          <div class="modal-sub">
+            <i class="fas fa-layer-group" style="margin-right:4px"></i>ภาพรวมทั้งกรม (124 หน่วยงาน/จังหวัด) | แผนงาน: ${items[0]?.plan || '-'}
+          </div>
+        </div>
+        <button class="modal-close" onclick="closeDetailModal()"><i class="fas fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding-top:12px">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:12px 16px;background:var(--page);border-radius:10px;border:1px solid var(--border)">
+          <div style="font-size:.85rem">
+            <span style="color:var(--muted)">เป้าหมายรวมโครงการทั้งกรม:</span>
+            <strong style="color:${color};font-size:1.05rem;margin-left:6px">${fmt(projTarget)}</strong>
+            <span style="color:var(--muted);font-size:.8rem;margin-left:2px">${proj.unit || ''}</span>
+          </div>
+          <div style="display:flex;gap:14px;font-size:.82rem">
+            <div><span style="color:var(--muted)">Q1:</span> <strong style="color:var(--blue)">${fmt(pQ1)}</strong></div>
+            <div><span style="color:var(--muted)">Q2:</span> <strong style="color:var(--teal)">${fmt(pQ2)}</strong></div>
+            <div><span style="color:var(--muted)">Q3:</span> <strong style="color:var(--amber)">${fmt(pQ3)}</strong></div>
+            <div><span style="color:var(--muted)">Q4:</span> <strong style="color:var(--rose)">${fmt(pQ4)}</strong></div>
+          </div>
+        </div>
+        <div class="tw" style="overflow:auto;max-height:58vh">
+          <table>
+            <thead style="position:sticky;top:0;background:#fff;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+              <tr>
+                <th style="width:55px">#</th>
+                <th>กิจกรรม / รายการ</th>
+                <th style="width:75px">หน่วย</th>
+                <th class="r" style="width:120px">เป้าหมายรวมทั้งกรม</th>
+                <th class="r q1">Q1</th>
+                <th class="r q2">Q2</th>
+                <th class="r q3">Q3</th>
+                <th class="r q4">Q4</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(it => {
+                const agg = rowAgg[String(it.r)] || { t:0, q1:0, q2:0, q3:0, q4:0 };
+                const isZero = agg.t === 0;
+                const indent = Math.max(0, (it.level - 2) * 16);
+                return `<tr class="${isZero ? 'act-zero' : ''}">
+                  <td><span class="badge-row">R${it.r}</span></td>
+                  <td>
+                    <div style="padding-left:${indent}px;display:flex;align-items:baseline;gap:6px">
+                      ${it.code ? `<span class="badge-code">${it.code}</span>` : ''}
+                      <span class="${it.level <= 2 ? 'bold' : ''}">${it.name}</span>
+                    </div>
+                  </td>
+                  <td style="color:var(--muted);font-size:.8rem">${it.unit || ''}</td>
+                  <td class="r bold" style="color:${agg.t > 0 ? 'var(--purple)' : 'var(--light)'}">${agg.t > 0 ? fmt(agg.t) : '-'}</td>
+                  <td class="r qt1">${agg.q1 > 0 ? fmt(agg.q1) : '-'}</td>
+                  <td class="r qt2">${agg.q2 > 0 ? fmt(agg.q2) : '-'}</td>
+                  <td class="r qt3">${agg.q3 > 0 ? fmt(agg.q3) : '-'}</td>
+                  <td class="r qt4">${agg.q4 > 0 ? fmt(agg.q4) : '-'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-foot" style="justify-content:space-between">
+        <button class="btn-tool" style="color:var(--purple);border-color:rgba(108,99,255,.4);font-weight:600;padding:7px 14px" onclick="goToProjectPage(${proj.num})">
+          <i class="fas fa-table-list"></i> ดูการจัดสรรรายจังหวัด / หน่วยงาน (124 แห่ง) <i class="fas fa-arrow-right" style="font-size:.7rem;margin-left:4px"></i>
+        </button>
+        <button class="btn-tool" style="background:var(--dark);color:#fff;border-color:var(--dark);padding:7px 16px" onclick="closeDetailModal()">ปิด</button>
+      </div>
+    </div>
+  </div>`;
+
+  let mDiv = document.getElementById('modalContainer');
+  if(!mDiv){
+    mDiv = document.createElement('div');
+    mDiv.id = 'modalContainer';
+    document.body.appendChild(mDiv);
+  }
+  mDiv.innerHTML = mHtml;
+}
+
+function goToProjectPage(pNum){
+  closeDetailModal();
+  S.projNum = pNum;
+  go('project');
 }
 
 // INIT
