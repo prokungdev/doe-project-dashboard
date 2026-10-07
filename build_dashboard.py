@@ -417,7 +417,7 @@ td.qt4{color:var(--rose);font-weight:600}
       <i class="fas fa-search"></i>
       <input type="text" id="tsInput" placeholder="ค้นหาหน่วยงาน..." oninput="tsSearch(this.value)">
     </div>
-    <div class="tb-date">📅 29 ก.ย. 2569</div>
+    <div class="tb-date">📅 5 ต.ค. 2569</div>
   </div>
   <main class="content" id="content"></main>
 </div>

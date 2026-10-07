@@ -3,7 +3,7 @@
 """
 extract_details.py
 Extracts detailed activity breakdown (rows 8-194) for all 124 units from:
-data/จัดสรร  ณ 29 ก.ย. 69 ตัดแผนงานพื้นฐานออก.xlsx
+data/1.จัดสรร  ณ 5 ต.ค. ตัดแผนงานพื้นฐานออก_20261007.xlsx
 Outputs: dashboard_detail.json
 """
 import openpyxl, json, os, sys
@@ -11,7 +11,7 @@ import openpyxl, json, os, sys
 def extract():
     sys.stdout.reconfigure(encoding='utf-8')
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    excel_path = os.path.join(base_dir, 'data', 'จัดสรร  ณ 29 ก.ย. 69 ตัดแผนงานพื้นฐานออก.xlsx')
+    excel_path = os.path.join(base_dir, 'data', '1.จัดสรร  ณ 5 ต.ค. ตัดแผนงานพื้นฐานออก_20261007.xlsx')
     
     print(f"Loading {excel_path}...")
     wb = openpyxl.load_workbook(excel_path, data_only=True)

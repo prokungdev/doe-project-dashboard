@@ -83,11 +83,12 @@
 ├── index.html              # ไฟล์แดชบอร์ดหลักสำหรับขึ้น GitHub Pages
 ├── dashboard.html          # ไฟล์แดชบอร์ดแบบ Standalone
 ├── build_dashboard.py      # Script ภาษา Python สำหรับรวบรวมข้อมูลและสร้าง HTML
+├── extract_data.py         # Script สกัดข้อมูลภาพรวมรายโครงการ 11 โครงการจากชีต Excel
 ├── extract_details.py      # Script สกัดข้อมูลรายละเอียดกิจกรรม 187 แถวจากชีต Excel
 ├── dashboard_data.json     # ข้อมูลเป้าหมายภาพรวมรายโครงการในรูปแบบ Clean JSON
 ├── dashboard_detail.json   # ข้อมูลรายละเอียดกิจกรรมรายหน่วยงาน (187 แถว x 124 ชีต)
 ├── data/                   # โฟลเดอร์เก็บไฟล์ Excel ต้นฉบับ
-│   └── จัดสรร  ณ 29 ก.ย. 69 ตัดแผนงานพื้นฐานออก.xlsx
+│   └── 1.จัดสรร  ณ 5 ต.ค. ตัดแผนงานพื้นฐานออก_20261007.xlsx
 └── README.md               # เอกสารประกอบโปรเจกต์
 ```
 
